@@ -13,15 +13,9 @@ website:
             href: projects/cnn_model.qmd
           - text: "Survival Analysis and Life Table"
             href: projects/survival_analysis.qmd
-          - text: "Time Series Analysis"
-            href: projects/time_series.qmd
       - text: "About Me"
-        menu:
-          - text: "Goals"
-            href: about_me/goals.qmd
-          - text: "Education"
-            href: about_me/education.qmd
-
+        href: about.qmd
+      
 format:
   html:
     theme: flatly

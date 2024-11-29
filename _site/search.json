@@ -75,5 +75,26 @@
     "title": "Project Coming Soon",
     "section": "",
     "text": "Project Coming Soon\n\nThe project will be available shortly—stay tuned for updates."
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site\n\n1 + 1\n\n[1] 2"
+  },
+  {
+    "objectID": "index.html#over-the-last-couple-of-months-ive-worked-on-some-intresting-side-projects",
+    "href": "index.html#over-the-last-couple-of-months-ive-worked-on-some-intresting-side-projects",
+    "title": "Project portfolio",
+    "section": "Over the last couple of months, I’ve worked on some intresting side projects:",
+    "text": "Over the last couple of months, I’ve worked on some intresting side projects:\n\n\n\n\nCNN Model Project\n\n\n\n\n\n\nSurvival Analysis\n\n\n\n\n\n\nTime Series Analysis"
+  },
+  {
+    "objectID": "index.html#over-the-last-couple-of-months-ive-worked-on-some-interesting-side-projects",
+    "href": "index.html#over-the-last-couple-of-months-ive-worked-on-some-interesting-side-projects",
+    "title": "Project portfolio",
+    "section": "Over the last couple of months, I’ve worked on some interesting side projects:",
+    "text": "Over the last couple of months, I’ve worked on some interesting side projects:\n\n\n\n\nCNN Model Project\n\n\n\n\n\n\nSurvival Analysis\n\n\n\n\n\n\nTime Series Analysis"
   }
 ]

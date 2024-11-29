@@ -20,7 +20,7 @@ What if the image below wasn't just a view of Earth at night, but a reflection o
 
 ![](images/nasa.jpg){width="100%"}
 
-## Over the last couple of years, I've worked on:
+## Over the last couple of months, I've worked on some interesting side projects:
 
 ::: {.container markdown="1"}
 ::: {.card .card-container markdown="1"}

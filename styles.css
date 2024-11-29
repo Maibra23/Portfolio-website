@@ -7,13 +7,13 @@ body {
 
 /* Hero section styling with overlay */
 .hero {
-  background: url('images/nasa.jpg') no-repeat center center;
+  background: url('images/spills.jpg') no-repeat center center;
   background-size: cover;
   color: white;
   text-align: center;
-  padding: 60px 20px; /* Adjusted for better responsiveness */
+  padding: 60px 20px;
   margin-bottom: 20px;
-  position: relative; /* To position overlay correctly */
+  position: relative;
 }
 
 .hero::before {
@@ -29,12 +29,12 @@ body {
 
 .hero h1,
 .hero p {
-  position: relative; /* Ensures text appears above the overlay */
+  position: relative;
   z-index: 1;
 }
 
 .hero h1 {
-  font-size: 2.5rem; /* Adjusted for better scaling on mobile */
+  font-size: 2.5rem; /* Scales better on mobile */
 }
 
 .hero p {
@@ -43,65 +43,100 @@ body {
 
 /* Navigation bar active state */
 .navbar .active {
-  font-weight: bold; /* Make active menu items bold */
-  color: #0056b3; /* Highlight active menu item in darker blue */
-  text-decoration: underline; /* Optional: Underline active menu item */
+  font-weight: bold;
+  color: #0056b3; /* Darker blue for active state */
+  text-decoration: underline;
+}
+
+/* Dropdown styling for navbar menus */
+.navbar .dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.navbar .dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+.navbar .dropdown-menu {
+  display: none; /* Hidden by default */
+  position: absolute;
+  background-color: white; /* Matches the theme */
+  min-width: 160px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  z-index: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  list-style: none; /* Remove bullet points */
+  margin: 0;
+}
+
+.navbar .dropdown-menu a {
+  color: #555; /* Neutral text color */
+  padding: 10px 20px; /* Spacing for items */
+  text-decoration: none; /* Remove underline */
+  display: block;
+}
+
+.navbar .dropdown-menu a:hover {
+  background-color: #f8f8f8; /* Light gray on hover */
+  color: #0056b3; /* Corporate blue */
 }
 
 /* Container layout */
 .container {
   display: flex;
   flex-wrap: wrap;
-  gap: 30px; /* Adjusted spacing for better visual appeal */
+  gap: 30px;
   justify-content: center;
 }
 
 /* Card styling */
 .card-container {
-  flex: 1 1 calc(33.333% - 30px); /* Responsive layout for cards */
-  min-width: 280px; /* Minimum size for smaller screens */
+  flex: 1 1 calc(33.333% - 30px);
+  min-width: 280px;
   text-align: center;
-  border: 1px solid #ccc; /* Softer border for a cleaner look */
+  border: 1px solid #ccc;
   border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   padding: 25px;
   background-color: white;
   transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .card-container:hover {
-  transform: translateY(-5px); /* Lift effect on hover */
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2); /* Enhanced hover shadow */
-  background-color: #f8f8f8; /* Light grey background on hover */
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+  background-color: #f8f8f8;
 }
 
 .card-container h3 {
-  font-size: 1.5rem; /* Increased font size for emphasis */
-  color: #333; /* Neutral dark grey text */
+  font-size: 1.5rem;
+  color: #333;
   margin-bottom: 10px;
 }
 
 /* Remove underlining and ensure clickable cards */
 .card-container a {
-  text-decoration: none; /* Removes the underline */
-  color: inherit; /* Ensures the link inherits the text color from the parent */
-  display: block; /* Makes the entire card clickable */
-  height: 100%; /* Ensures the clickable area spans the entire card */
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  height: 100%;
 }
 
 .card-container a:hover {
-  color: inherit; /* Keeps the text color unchanged on hover */
-  text-decoration: none; /* Ensures no underline on hover */
+  color: inherit;
+  text-decoration: none;
 }
 
-/* General link styling for the "Learn More About Me" section */
+/* General link styling */
 body a {
-  text-decoration: none; /* Remove underlining */
-  color: #007bff; /* Set a consistent link color */
-  transition: color 0.3s ease; /* Smooth color transition on hover */
+  text-decoration: none;
+  color: #007bff; /* Consistent link color */
+  transition: color 0.3s ease;
 }
 
 body a:hover {
-  color: #0056b3; /* Optional: Darker blue on hover for clarity */
-  text-decoration: underline; /* Optional: Underline only on hover */
+  color: #0056b3; /* Darker blue on hover */
+  text-decoration: underline;
 }
