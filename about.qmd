@@ -1,0 +1,35 @@
+::: {.panel .panel-default}
+::: {style="text-align: center;"}
+## Who am I {style="text-align: center;"}
+
+::: {.panel .panel-default}
+My name is Mustafa, and the things I value most are honesty,
+generosity, and hard work. These are the principles that keep me
+grounded---in both my personal life and the way I approach my work. For some, they may seem like abstract concepts, but for me, they shape how I interact with people and approach my day to day challenges .
+
+Football has shaped a big part of who I am. I spent almost two decades playing the game, including some time at a semi-elite level. But it wasn't just about winning matches. It taught me how to lead a team, really listen to others, and find ways to bring people together. And maybe the biggest lesson? Learning to stick with something, no matter how tough it gets.
+
+Those lessons didn't stay on the field. They show up in my day-to-day life. Staying active, picking up a new book, or trying something completely new---it's all part of how I keep learning and growing.
+:::
+:::
+:::
+
+::: {.panel .panel-default}
+::: {style="text-align: center;"}
+## Experiences that shaped me {style="text-align: center;"}
+
+::: {.panel .panel-default}
+One of the key moment that shaped me, I still remember it to this day. As an introvert, selling was definitely not my strongest skill. Putting myself out there to sell goods and talk to strangers wasn't easy. At first, I stumbled. It felt awkward and way out of my depth. But I stuck with it, and at last, things started to click and became relatively easier. I became more confident, learned to connect with people on a deeper level, and realized how important it is to just listen sometimes.
+:::
+:::
+:::
+
+::: {.panel .panel-default}
+::: {style="text-align: center;"}
+## Education and goals {style="text-align: center;"}
+
+I have never considered myself a 'math person.' But you know how sometimes curiosity gets the better of you? That's what happened to me with math. Since then, I have become fascinated by the logic and precision of math and statistics, which certainly motivated me to earn a Master's degree in Economics, a path I believe will benefit my long-term goal of becoming a risk analyst. Right now, I'm expanding my knowledge by building my foundation through courses in actuarial mathematics and stochastic processes
+:::
+:::
+
+:::

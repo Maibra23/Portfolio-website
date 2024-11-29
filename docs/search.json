@@ -7,20 +7,6 @@
     "text": "Explore the world of information"
   },
   {
-    "objectID": "about.html",
-    "href": "about.html",
-    "title": "About",
-    "section": "",
-    "text": "About this site\n\n1 + 1\n\n[1] 2"
-  },
-  {
-    "objectID": "index.html#welcome-im-mustafa-and-my-journey-in-data-analysis-began-with-a-fundamental-curiosity-why-is-some-data-complex-to-uncover-and-how-can-simplifying-this-complexity-change-the-narratives-that-reshape-our-everyday-experiences",
-    "href": "index.html#welcome-im-mustafa-and-my-journey-in-data-analysis-began-with-a-fundamental-curiosity-why-is-some-data-complex-to-uncover-and-how-can-simplifying-this-complexity-change-the-narratives-that-reshape-our-everyday-experiences",
-    "title": "Project portfolio",
-    "section": "Welcome! I’m Mustafa, and my journey in data analysis began with a fundamental curiosity: Why is some data complex to uncover, and how can simplifying this complexity change the narratives that reshape our everyday experiences?",
-    "text": "Welcome! I’m Mustafa, and my journey in data analysis began with a fundamental curiosity: Why is some data complex to uncover, and how can simplifying this complexity change the narratives that reshape our everyday experiences?\nWhat if the image below wasn't just a view of Earth at night, but a reflection of the complexity of data? Each light could be a piece of information, scattered and interconnected, waiting to tell a story. How much could we uncover just by taking a closer look? Data can feel overwhelming, like staring at all these lights for the first time, but once we start making sense of it, patterns and insights begin to emerge. What do you see in this image? What story would you start to tell?\nOver the last couple years, I’ve worked on:\n- Building classification models like CNNs to classify images.\n- Analyzing economic trends using Time Series Analysis.\n- Explored human behavior with Survival Analysis.\nCheck out my Projects or About Me to learn more about my work and aspirations."
-  },
-  {
     "objectID": "index.html#my-data-journey",
     "href": "index.html#my-data-journey",
     "title": "Project portfolio",
@@ -28,11 +14,11 @@
     "text": "My Data Journey\nWelcome! I’m Mustafa, and my journey in data analysis began with a fundamental curiosity: Why is some data complex to uncover, and how can simplifying this complexity change the narratives that reshape our everyday experiences?\nWhat if the image below wasn’t just a view of Earth at night, but a reflection of the complexity of data? Each light could be a piece of information, scattered and interconnected, waiting to tell a story. How much could we uncover just by taking a closer look? Data can feel overwhelming, like staring at all these lights for the first time, but once we start making sense of it, patterns and insights begin to emerge. What do you see in this image? What story would you start to tell?"
   },
   {
-    "objectID": "index.html#explore-my-work",
-    "href": "index.html#explore-my-work",
-    "title": "Home",
-    "section": "Explore My Work",
-    "text": "Explore My Work\n\n\n\n\n  ### CNN Model Project\n  A deep dive into image classification using Convolutional Neural Networks.\n&lt;/div&gt;\n \n\n  ### Survival Analysis\n  Statistical analysis of life tables and survival probabilities.\n&lt;/div&gt;\n \n\n  ### Time Series Analysis\n  Forecasting trends in stock price data using ARIMA models.\n&lt;/div&gt;"
+    "objectID": "index.html#over-the-last-couple-of-months-ive-worked-on-some-interesting-side-projects",
+    "href": "index.html#over-the-last-couple-of-months-ive-worked-on-some-interesting-side-projects",
+    "title": "Project portfolio",
+    "section": "Over the last couple of months, I’ve worked on some interesting side projects:",
+    "text": "Over the last couple of months, I’ve worked on some interesting side projects:\n\n\n\n\nCNN Model Project\n\n\n\n\n\n\nSurvival Analysis"
   },
   {
     "objectID": "index.html#learn-more-about-me",
@@ -40,13 +26,6 @@
     "title": "Project portfolio",
     "section": "Learn More About Me",
     "text": "Learn More About Me\n\nMy Goals\nMy Education"
-  },
-  {
-    "objectID": "index.html#over-the-last-couple-of-years-ive-worked-on",
-    "href": "index.html#over-the-last-couple-of-years-ive-worked-on",
-    "title": "Project portfolio",
-    "section": "Over the last couple of years, I’ve worked on:",
-    "text": "Over the last couple of years, I’ve worked on:\n\n\n\n\nCNN Model Project\n\n\n\n\n\n\nSurvival Analysis\n\n\n\n\n\n\nTime Series Analysis"
   },
   {
     "objectID": "projects/cnn_model.html",
@@ -75,5 +54,47 @@
     "title": "CNN Model Project",
     "section": "3.3 Model 3 Evaluation",
     "text": "3.3 Model 3 Evaluation\nThe results of Model 3 training are illustrated in this plot. The plot shows clear progress, especially when compared to the plot of Model 2. Training and validation losses decrease consistently, with validation loss stabilizing at a noticeably lower value. Validation accuracy steadily improves and aligns more closely with training accuracy, reflecting stronger generalization. The evaluation results for Model 3 further emphasize these gains, achieving a validation loss of 0.4722 and a higher accuracy of 86.23%, compared to Model 2’s accuracy of 84.6%%. These improvements are largely due to the introduction of data augmentation, which diversified the dataset and allowed the model to better handle unseen data.\nThere are several ways to further optimize the model and enhance its performance. One commonly used approach is fine-tuning the hyperparameters. This is a process that mostly involves experimenting with different aspects of the learning process, such as adjusting the learning rate, modifying the number of epochs, or testing various batch sizes to find the best configuration. For example, using a smaller learning rate allows the model to take smaller, more precise steps toward an optimal solution, reducing the risk of missing key patterns. On the other hand, a larger learning rate can speed up training but may overshoot ideal values, leading to sub-optimal results. Similarly, adjusting the number of epochs can help the model learn more thoroughly, while experimenting with batch sizes affects computational efficiency and gradient stability.\nWe believe these strategies are valuable if our main focus lies in optimizing our CNN model, but they require careful experimentation and additional resources that we currently do not possess. Unfortunately, this falls beyond the scope of the current project. However, these methods remain valuable options for future refinement if more time or resources become available."
+  },
+  {
+    "objectID": "projects/survival_analysis.html",
+    "href": "projects/survival_analysis.html",
+    "title": "Project Coming Soon",
+    "section": "",
+    "text": "Project Coming Soon\n\nThe project will be available shortly—stay tuned for updates."
+  },
+  {
+    "objectID": "index.html#about-me",
+    "href": "index.html#about-me",
+    "title": "Project portfolio",
+    "section": "About me",
+    "text": "About me"
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "Home",
+    "section": "",
+    "text": "Honesty, generosity, and hard work are things I really care about. They’re what keep me grounded—both at work and in my personal life.\nFootball has shaped a big part of who I am. I spent almost two decades playing the game, including some time at a semi-elite level. But it wasn’t just about winning matches. It taught me how to lead a team, really listen to others, and find ways to bring people together. And maybe the biggest lesson? Learning to stick with something, no matter how tough it gets.\nThose lessons didn’t stay on the field. They show up in my day-to-day life. Staying active, picking up a new book, or trying something completely new—it’s all part of how I keep learning and growing.\n:::"
+  },
+  {
+    "objectID": "about.html#who-am-i",
+    "href": "about.html#who-am-i",
+    "title": "Home",
+    "section": "",
+    "text": "Honesty, generosity, and hard work are things I really care about. They’re what keep me grounded—both at work and in my personal life.\nFootball has shaped a big part of who I am. I spent almost two decades playing the game, including some time at a semi-elite level. But it wasn’t just about winning matches. It taught me how to lead a team, really listen to others, and find ways to bring people together. And maybe the biggest lesson? Learning to stick with something, no matter how tough it gets.\nThose lessons didn’t stay on the field. They show up in my day-to-day life. Staying active, picking up a new book, or trying something completely new—it’s all part of how I keep learning and growing."
+  },
+  {
+    "objectID": "about.html#experiences-that-shaped-me",
+    "href": "about.html#experiences-that-shaped-me",
+    "title": "Home",
+    "section": "Experiences that shaped me",
+    "text": "Experiences that shaped me\n\nOne of the key moment that shaped me, I still remember it to this day. As an introvert, selling was definitely not my strongest skill. Putting myself out there to sell goods and talk to strangers wasn’t easy. At first, I stumbled. It felt awkward and way out of my depth. But I stuck with it, and at last, things started to click and became relatively easier. I became more confident, learned to connect with people on a deeper level, and realized how important it is to just listen sometimes."
+  },
+  {
+    "objectID": "about.html#education-and-goals",
+    "href": "about.html#education-and-goals",
+    "title": "Home",
+    "section": "Education and goals",
+    "text": "Education and goals\nI have never considered myself a ‘math person.’ But you know how sometimes curiosity gets the better of you? That’s what happened to me with math. Since then, I have become fascinated by the logic and precision of math and statistics. This new found interest motivated me to earn a Master’s degree in Economics, which I believe is to some extent beneficial in the long run for achieving my long-term goals, which is becoming a risk analyst. Right now, I’m expanding my knowledge by building my foundation through courses in actuarial mathematics and stochastic processes."
   }
 ]

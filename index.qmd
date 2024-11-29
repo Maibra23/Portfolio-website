@@ -8,6 +8,7 @@ title: "Project portfolio"
 
 ::: {.hero-text markdown="1"}
 # WELCOME!
+
 Explore the world of information
 :::
 :::
@@ -25,24 +26,19 @@ What if the image below wasn't just a view of Earth at night, but a reflection o
 ::: {.container markdown="1"}
 ::: {.card .card-container markdown="1"}
 <a href="projects/cnn_model.qmd" class="card-link">
-  <h3>CNN Model Project</h3>
+
+<h3>CNN Model Project</h3>
+
 </a>
 :::
 
 ::: {.card .card-container markdown="1"}
 <a href="projects/survival_analysis.qmd" class="card-link">
-  <h3>Survival Analysis</h3>
-</a>
-:::
 
-::: {.card .card-container markdown="1"}
-<a href="projects/time_series.qmd" class="card-link">
-  <h3>Time Series Analysis</h3>
+<h3>Survival Analysis</h3>
+
 </a>
 :::
 :::
 
-## Learn More About Me
-
-- [My Goals](about_me/goals.qmd)
-- [My Education](about_me/education.qmd)
+## [About me](about.qmd)
