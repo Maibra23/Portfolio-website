@@ -28,3 +28,4 @@ format:
     css: styles.css
     embed-resources: true
 
+output-dir: docs
