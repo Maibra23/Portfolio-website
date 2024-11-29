@@ -1,1 +1,9 @@
+::: {.panel .panel-default}
+::: {style="text-align: center;"}
+#  Project Coming Soon {style="text-align: center;"}
 
+::: {.panel .panel-default}
+The project will be available shortly---stay tuned for updates.
+:::
+:::
+:::
