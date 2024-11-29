@@ -1,0 +1,510 @@
+---
+title: "CNN Model Project"
+website:
+  navbar:
+    left:
+      - text: "Projects"
+        menu:
+          - text: "CNN Model"
+            href: projects/cnn_model.qmd
+
+format:
+  html:
+    toc: true               # Enables Table of Contents
+    toc-location: right     # Places TOC on the right side
+    toc-depth: 2            # Limits TOC depth to second-level headings
+    theme: litera           # Sets the website theme
+    number-sections: true   # Adds numbered sections
+    link-citations: true
+---
+
+
+# Introduction
+
+In this project, we build a Convolutional Neural Network (CNN) to classify images from the CIFAR-10 dataset using R, diverging from the common trend of using Python for machine learning. This CNN implementation serves as a crucial foundation before exploring more complex RNN models. The CIFAR-10 dataset contains 60,000 32x32 color images categorized into 10 classes, with 6,000 images per class. Our objective is to provide a systematic approach to constructing, training, and applying the model for image classification, setting up essential skills for advanced neural network architectures like RNN and LSTM. This could be considered a short tutorial that covers every step of the process, including dataset loading, model creation, training, and evaluation.
+
+# Dataset Loading and Preprocessing
+
+```{r, cache = TRUE, eval=TRUE,include=FALSE}
+# Needed packages and dependencies
+library(reticulate)
+
+# Needed when creating a new virtual environment for the first time #install_keras(method = "virtualenv", envname = "r-tensorflow-env")
+
+use_virtualenv("r-tensorflow-env", required = TRUE)
+library(tensorflow)
+library(keras)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+```
+
+Here we set up the necessary environment and packages to achieve our objective. We create a virtual environment to efficiently manage Python dependencies and ensure proper installation of Keras and TensorFlow for our deep learning tasks.
+
+```{r, cache = TRUE, eval=FALSE, results='hide'}
+
+# Load CIFAR-10 dataset
+cifar <- dataset_cifar10()
+
+# Assign training and test data
+t.images <- cifar$train$x
+t.labels <- cifar$train$y 
+test.images = cifar$test$x
+test.labels = cifar$test$y
+
+# Scaling (normalization)
+t.images = t.images / 255  
+test.images = test.images / 255
+
+# Class names for CIFAR-10
+class.names = c('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+# Plotting parameters
+index = 1:25
+plots = list()
+
+# Loop through each index to create a ggplot for each image
+
+for (i in index) {
+
+  img = t.images[i, , , ]
+
+  img = img / max(img)
+  
+  label_index = t.labels[i]  
+  label_index = as.integer(label_index)
+
+  # Converting
+  img_raster <- as.raster(img)
+
+  p = ggplot() + 
+    annotation_custom(rasterGrob(img_raster, interpolate = TRUE)) +
+    labs(title = class.names[label_index + 1]) + 
+    theme_void() + 
+    theme(plot.title = element_text(hjust = 0.5, size = 10, face = "bold"))
+
+  plots[[i]] = p
+}
+
+# Save the plot to a file, to avoid re-running this during knitting
+png("cifar10_sample_images_corrected_labels2.png", width = 1200, height = 1200, res = 150)
+do.call(grid.arrange, c(plots, ncol = 5))
+dev.off()
+
+# Now, One-hot encoding of labels 
+t.labels <- to_categorical(t.labels, num_classes = 10)  
+test.labels <- to_categorical(test.labels, num_classes = 10)
+```
+
+Here, we load the CIFAR-10 dataset using the dataset_cifar10() function from the keras package. We then split the data into training and testing sets. This splitting is a simple yet crucial step for evaluating the model's performance on unseen data and assessing its generalization capability. By having separate training and testing sets, we can ensure that our model learns from one set of data and is evaluated on entirely new examples, providing a more accurate measure of its real-world performance. The pixel values are normalized to a range of \[0, 1\] for several important reasons. First, this normalization improves convergence during training by ensuring all input features are on a similar scale. When pixel values are in the range of 0-255, the model may struggle to learn effectively due to the large differences in scale between features. This procedure is a way to standardize the input and simplify for neural network to process the data to learn.
+
+Also, the last part of the code, we visualize 25 training images with their respective labels and save the plot.After completing the plot, labels are converted to one-hot encoded vectors, which is necessary for classification tasks with categorical cross-entropy loss. One-hot encoding transforms categorical variables into a format that can be effectively provided to machine learning algorithms, which is a necessary when we deal with multi-class classification problem. As it allows the model to output probabilities for each class and facilitates the computation of the loss function.
+
+Uploading the plot of the training images with their respective class labels
+
+```{r, cache = TRUE, eval=TRUE}
+# Uploading the plot
+knitr::include_graphics("images/cifar10_sample_images_corrected_labels.png")
+```
+
+# Model Construction
+
+```{r cache=TRUE, eval=TRUE}
+# Initial model
+model.1 <- keras_model_sequential() %>%
+   
+# First covn layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", input_shape = c(32, 32, 3), activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   
+# Second conv layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.2) %>%
+   
+# Third and fourth conv layer 
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.4)%>%
+   
+# Flatten layer
+   layer_flatten() %>%
+   
+# Output layer
+   layer_dense(units = 128, activation = 'relu') %>%
+   layer_dense(units = 10, activation = 'softmax')
+
+model.1 %>% summary()
+```
+
+This is our first attempt at building a CNN model. We create a sequential model with `keras_model_sequential` and then include all the necessary layers to the model. The CNN architecture adheres to established deep learning theories, specifically following the principles outlined in the book "Deep Learning" (2017) by Ian Goodfellow, Yoshua Bengio, and Aaron Courville. Diving into the feature of each layer is beyond the scope of this project, and therefore we suggest exploring the Keras package, where one could find a more comprehensive explanation of each layer's role and parameters. Simply, the model consists of convolutional layers for feature extraction, pooling layers for dimensionality reduction, dropout layers for regularization to prevent overfitting, and dense layers for classification.
+
+The structure of the model as discussed in the book, allows the network to learn hierarchical representations of the input data at varying levels of abstraction. Lower layers capture simple features, such as edges and textures, while middle layers combine these features to recognize more complex patterns, and higher layers identify entire objects or scenes. In some sense, this progressive learning enables the network to adapt to the complexity of the data, efficiently representing the underlying patterns.
+
+```{r, cache = TRUE, eval=TRUE}
+# Compiling of model 1
+model.1 %>% compile(
+  optimizer = "adam",
+  loss = 'categorical_crossentropy',
+  metrics = 'accuracy'
+)
+```
+
+Here we compile the model using the Adam optimizer as it is the appropriate choice and the most popular choice considering its ability to adjust the model learning rates during the training phase. for the loss function part, we used categorical cross-entropy since the task at hand revolves around a multi-class classification problem, and it effectively measures the performance of our model's predicted probabilities against the true labels. The metric we selected to provide a direct evaluation of the model performance was accuracy. Simply, It tells us the proportion of correct predictions, giving us a clear idea of how well the model is doing. This metric also lets us track the model's progress in real-time on both the training and validation sets, which is really helpful as we train the model.
+
+```{r, cache = TRUE, eval=FALSE}
+# Training model 1
+train.1 = model.1 %>% fit(
+  t.images, t.labels,
+  epochs = 50,        
+  batch_size = 32,  
+  validation_data = list(test.images, test.labels),
+  shuffle = TRUE
+)
+
+# Save the training  plot for model 1
+png("model_1_training_plot.png")
+plot(train.1)
+dev.off()
+save_model_hdf5(model.1, filepath = "cnn_model_1.h5")
+
+# Evaluate Model 1 and Save the Results
+evaluation_result = model.1 %>% evaluate(test.images, test.labels)
+saveRDS(evaluation_result, file = "model_1_evaluation.rds")
+
+```
+
+This is the phase where we train the model. We set the number of epochs to 50 and chose a batch size of 32, parameters we deemed appropriate for our model's architecture and, most importantly, suitable for our computational capabilities. While it's generally preferable to have more epochs for model training, we were constrained by conducting this project on a standard laptop, which limited our resources. An alternative approach to bypass such limitations would be to use cloud-based TPUs or GPUs, which could handle more epochs or provide faster training times. Yet, the current setup allows the project to remain accessible and feasible for those using typical computing resources.
+
+Also, we chose to shuffling the training data to help the model generalize better by reducing any biases that might arise from the order of the data. The validation_data function utilizes the previously split dataset of training data and test data. The intuition behind this step is straightforward, it offers an independent dataset (test data) to evaluate the model's performance during training. Which gives us information about how well the model generalizes to new/unseen data. Since the model may perform well on the training data, we are more interested on the model ability to generalize to new examples.
+
+```{r eval=TRUE, cache=TRUE}
+# Uploading
+knitr::include_graphics("images/model_1_training_plot.png")
+
+# Load the saved evaluation 
+evaluation_result <- readRDS("images/model_1_evaluation.rds")
+print(evaluation_result)
+
+```
+
+## Model 1 Evaluation
+
+The plot demonstrate the training results. The last part of the code represent the plot generated of the model performance during the training. By observing the plot, we detect a sign of overfitting. A situation where model performs exceptionally well on training data but poorly on new data. If the model's performance on the validation set begins to drop while continuing to improve on the training set, then this is a clear indication of overfittning. Now, with this plot, we can adjust our current model to mitigate the overfitting issue.
+
+```{r, cache = TRUE, eval=TRUE}
+# Model 2
+model.2 <- keras_model_sequential() %>%
+
+# First conv layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", input_shape = c(32, 32, 3), activation = 'relu') %>%
+   layer_batch_normalization() %>%
+
+# Second conv layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.2) %>%
+
+# Third and fourth conv layer
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.3) %>%
+
+# Fifth and sixth conv layer
+   layer_conv_2d(filters=128, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_conv_2d(filters=128, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.4) %>%
+
+# Flatten layer
+   layer_flatten() %>%
+
+# Dense layers
+   layer_dense(units = 256, activation = 'relu') %>%
+   layer_dense(units = 10, activation = 'softmax')
+
+model.2 %>% summary()
+```
+
+Since we observed overfitting issues in the plot for our initial model, we decided to adjust the capacity of our model, which we called model 2. We increased the complexity of the model by adding more convolutional layers and increasing the number of filters in the later layers. This approach was taken to potentially improve the model's ability to learn more complex features from the data. However, recognizing that deeper networks can be prone to memorizing patterns rather than learning generalizable features, we also implemented additional measures to combat potential overfitting. Specifically, we added more dropout layers throughout the network. These dropout layers act as a form of regularization, randomly deactivating a portion of neurons during training, which helps prevent the model from relying too heavily on any specific features.
+
+Our main goal with model 2 is to get better accuracy than the first model, while still avoiding overfitting. We're trying to find a balance between making the model smart enough to learn complex patterns, but not so complex that it just memorizes the training data.
+
+```{r, cache = TRUE}
+# Compile model.2
+model.2 %>% compile(
+  optimizer = "adam",
+  loss = 'categorical_crossentropy',
+  metrics = 'accuracy'
+)
+```
+
+The compiling set up for the model remains the same as the previous model, and we intent to keep it consistent across this project. Yet, we may adjust it if needed to optimize the model performance. Considering our computational limitation, we believe this set up is the optimal one between learning speed and stability. Additionally, by maintaining this consistency, we can more effectively compare the results of different model architectures.
+
+```{r, cache = TRUE, eval=FALSE}
+# Train Model 2
+train.2 = model.2 %>% fit(
+  t.images, t.labels,
+  epochs = 50,
+  batch_size = 32,
+  validation_data = list(test.images, test.labels),
+  shuffle = TRUE
+)
+
+# Saving
+png("model_2_training_plot2.png")
+plot(train.2)
+dev.off()
+
+save_model_hdf5(model.2, filepath = "cnn_model_2.h5")
+
+evaluation_result = model.2 %>% evaluate(test.images, test.labels)
+saveRDS(evaluation_result, file = "model_2_evaluation2.rds")
+
+```
+
+We are taking the same steps as in the initial model training as it align with our computation resource but also we want to ensure consistency and comparability across this project. Despite the architectural changes in model 2, maintaining these consistent training procedures allows us to isolate the effects of our model modifications. Any differences in performance can then be more confidently attributed to the changes in model structure rather than variations in the training process.
+
+```{r, cache = TRUE, eval=TRUE}
+# Uploading 
+knitr::include_graphics("images/model_2_training_plot.png")
+
+evaluation_result = readRDS("images/model_2_evaluation2.rds")
+print(evaluation_result)
+
+```
+
+## Model 2 Evaluation
+
+The plot here are the results of model 2 training, and comparing it to model 1 it reveals some notable contrasts. In the case of model 1, we observe signs of overfitting. We can see that the training loss decreases steadily, while the validation loss begins to rise after an initial dip. At the same time, training accuracy climbs to its highest level, in the mean time validation accuracy stagnates and even declines slightly, signaling poor generalization. This type of behavior often suggests that the model relies on memorization, basically memorizing training data rather than learning patterns that extend to unseen data. The result of evaluation metrics back this up, with model 1 achieving a validation loss of 0.798 and an accuracy of 81.73%, reflecting its limited effectiveness on new data.
+
+Model 2, however, shows a slight improvement, specifically if we observe the decreased gap in the accuracy part between the two plots. Training and validation losses both decrease smoothly, with validation loss stabilizing at a lower point. Validation accuracy also shows consistent growth, closely tracking training accuracy, which signals stronger generalization. The evaluation results confirm these gains, as model 2 achieves a reduced validation loss of 0.554 and a higher accuracy of 84.6%. Regularization techniques, like dropout, were key to this improvement. As a result, model 2 is not only better at generalizing but also more dependable for real-world tasks.
+
+Although model 2 shows significant improvements over model 1, there is still room for further enhancement.The validation loss, while reduced, remains higher than the training loss, indicating a potential gap in generalization. With that in mind, There is different techniques that could be applied to refine our current model. We could say that we need to improve the model, and the best approach we came up with was implementing data augmentation to artificially expand the training data and its diversity.
+
+```{r, cache = TRUE, eval=FALSE}
+# Now adding Data Augmentation for model.3
+
+# Data augmentation prep
+datagen = image_data_generator(
+  rotation_range = 30,
+  width_shift_range = 0.1,  
+  height_shift_range = 0.1, 
+  shear_range = 0.2,        
+  zoom_range = 0.2,        
+  horizontal_flip = TRUE,   
+  fill_mode = "nearest" )
+
+# data augmentation generator to training data
+datagen %>% fit_image_data_generator(t.images)
+```
+
+Data augmentation is an approach that is widely used to create new versions of already existing images by manipulating their features. Simply put, it involves applying changes to existing images through techniques like rotating, flipping, cropping, or adjusting brightness. This can be beneficial because it helps the model learn better by exposing it to different variations of the images without needing more real images. Our believe is that this could improve the model's performance, especially when we have limited data.
+
+```{r, cache = TRUE, eval=TRUE}
+# New Model (model.3) with the same architecture as model.2
+model.3 <- keras_model_sequential() %>%
+   
+# First conv layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", input_shape = c(32, 32, 3), activation = 'relu') %>%
+   layer_batch_normalization() %>%
+
+# Second conv layer
+   layer_conv_2d(filters=32, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.25) %>%
+
+# Third and fourth conv layer
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_conv_2d(filters=64, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.35) %>%
+
+# Fifth and sixth conv layer
+   layer_conv_2d(filters=128, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_conv_2d(filters=128, kernel_size = c(3, 3), padding="same", activation = 'relu') %>%
+   layer_batch_normalization() %>%
+   layer_max_pooling_2d(pool_size = c(2,2)) %>%
+   layer_dropout(0.45) %>%
+
+# Flatten layer
+   layer_flatten() %>%
+
+# Dense layers
+   layer_dense(units = 256, activation = 'relu') %>%
+   layer_dense(units = 10, activation = 'softmax')
+
+model.3 %>% summary()
+```
+
+To improve our model further, we named this new version model 3 for simplicity reasons. This model maintains the same design as model 2, just to be able to implement the data augmentation technique to improve the models performance. By keeping the architecture identical to model 2, we can directly observe the impact of data augmentation on the model's ability to learn and generalize. But the implementation of data augmentation do not happen until the training phase.
+
+```{r, cache = TRUE, eval=TRUE}
+# Compile model.3 (same as model.2)
+model.3 %>% compile(
+  optimizer = "adam",
+  loss = 'categorical_crossentropy',
+  metrics = 'accuracy'
+)
+```
+
+The compilation process for this part is identical to that of Model 2. We intentionally maintained the same compilation settings to make sure a fair comparison between the two models. This will keep the architecture and compilation parameters consistent, we can more accurately observe and analyze any differences in performance.
+
+```{r, cache = TRUE, eval=FALSE}
+# Train Model 3 with augmented data
+generator = flow_images_from_data(t.images, t.labels, datagen, batch_size = 32)
+train.3 = model.3 %>% fit(
+  generator,
+  steps_per_epoch = as.integer(nrow(t.images) / 32),
+  epochs = 50,
+  validation_data = list(test.images, test.labels),
+  shuffle = TRUE
+)
+
+# Saving
+png("model_3_training_plot3.png")
+plot(train.3)
+dev.off()
+
+save_model_hdf5(model.3, filepath = "cnn_model_3.h5")
+
+# Saving the Results
+evaluation_result =  model.3 %>% evaluate(test.images, test.labels)
+saveRDS(evaluation_result, file = "model_3_evaluation3.rds")
+```
+
+In this script, we train model 3 with augmented data to improve the model generalization capability. This can be achieved by first creating a data generator that applies real-time augmentations to the input images (t.images) and their corresponding labels (t.labels) during training, and then feeding the augmented data directly into the model. Similarly to the previous set up, the model trains for 50 epochs in batches of 32, with validation data tracking its performance. A plot of the training progress is saved as model_3_training_plot3.png, and the trained model is stored in HDF5 format (cnn_model_3.h5) for later use.
+
+```{r, eval=TRUE}
+# The results for Model 3
+knitr::include_graphics("images/model_3_training_plot3.png")
+
+# Load the Saved Evaluation Result
+evaluation_result <- readRDS("images/model_3_evaluation3.rds")
+print(evaluation_result)
+
+```
+
+## Model 3 Evaluation
+
+The results of Model 3 training are illustrated in this plot. The plot shows clear progress, especially when compared to the plot of Model 2. Training and validation losses decrease consistently, with validation loss stabilizing at a noticeably lower value. Validation accuracy steadily improves and aligns more closely with training accuracy, reflecting stronger generalization. The evaluation results for Model 3 further emphasize these gains, achieving a validation loss of 0.4722 and a higher accuracy of 86.23%, compared to Model 2's accuracy of 84.6%%. These improvements are largely due to the introduction of data augmentation, which diversified the dataset and allowed the model to better handle unseen data.
+
+There are several ways to further optimize the model and enhance its performance. One commonly used approach is fine-tuning the hyperparameters. This is a process that mostly involves experimenting with different aspects of the learning process, such as adjusting the learning rate, modifying the number of epochs, or testing various batch sizes to find the best configuration. For example, using a smaller learning rate allows the model to take smaller, more precise steps toward an optimal solution, reducing the risk of missing key patterns. On the other hand, a larger learning rate can speed up training but may overshoot ideal values, leading to sub-optimal results. Similarly, adjusting the number of epochs can help the model learn more thoroughly, while experimenting with batch sizes affects computational efficiency and gradient stability.
+
+We believe these strategies are valuable if our main focus lies in optimizing our CNN model, but they require careful experimentation and additional resources that we currently do not possess. Unfortunately, this falls beyond the scope of the current project. However, these methods remain valuable options for future refinement if more time or resources become available.
+
+# Confusion Matrix
+
+```{r, cache = TRUE, eval=FALSE}
+# Generate predictions with confusion matrix
+predictions <- model.3 %>% predict(test.images)
+predicted_classes <- predictions %>% k_argmax() %>% as.array()
+true_labels <- apply(test.labels, 1, which.max) - 1
+confusion_matrix <- table(Predicted = predicted_classes, True = true_labels)
+
+# Display confusion matrix
+plot_confusion_matrix <- function(cm) {
+  cm_df <- as.data.frame(cm)
+  ggplot(data = cm_df, aes(x = True, y = Predicted, fill = Freq)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(low = "white", high = "blue") +
+    geom_text(aes(label = Freq), vjust = 1) +
+    theme_minimal() +
+    labs(title = "Confusion Matrix", x = "Predicted Label", y = "True Label")
+}
+
+# Saving the plot 
+png("confusion_matrix_plot.png", width = 800, height = 600)
+cm_plot <- plot_confusion_matrix(confusion_matrix)
+print(cm_plot)
+dev.off()
+```
+
+```{r, eval=TRUE}
+# Uploading the C.matrix
+knitr::include_graphics("images/confusion_matrix_plot.png")
+```
+
+Having completed our model, we now proceed to test it by visualizing its classification performance in a detailed and interpretable manner. Rather than relying solely on summary metrics like accuracy, we'll use a confusion matrix to show per-class performance. This is a tool that provides a thorough breakdown of how our model's predictions align with the true labels (encoded numerically) across each class, allowing us to easily identify the model's strengths and weaknesses. Rows represent the true labels, while columns represent predicted labels, and each cell shows the frequency of that prediction. The colored diagonal cells indicate correct classifications, while off-diagonal cells represent the frequency of misclassifications.
+
+The confusion matrix helps us see whether the model tends to misclassify certain classes more often than others. Such information points to areas that need further fine-tuning or additional training data. It also helps us detect patterns or imbalances in the model's overall performance and reliability. We observe that some classes, like class '9', are predicted accurately, while others, such as class '5' or '6', show more frequent misclassifications.
+
+Now, we can generate random predictions to see which classes are classified correctly and which are not. This will help us analyze the model's behavior visually by plotting a grid of random predictions.
+
+# Random Predictions
+
+```{r,cache = TRUE, eval=FALSE}
+# Make predictions
+predicted_probs = model.3 %>% predict(test.images)
+predicted_labels = apply(predicted_probs, 1, which.max) - 1 # Convert to class indices
+true_labels = apply(test.labels, 1, which.max) - 1 # Convert to class indices
+
+# Select random indices for visualization
+set.seed(as.numeric(Sys.time()))  # Generates a new seed every time
+num_images <- 25
+random_indices <- sample(1:nrow(test.images), num_images)
+
+# Open PNG device for saving
+png("predicted_images_grid.png", width = 2000, height = 2000, res = 200)
+
+# Plot setup
+par(mfrow = c(5, 5), mar = c(1, 1, 2, 1)) # 5x5 grid with minimal margins
+
+for (i in 1:num_images) {
+  idx = random_indices[i]
+  img = test.images[idx, , , ] # Get image
+  
+  # Get labels
+  predicted_label = predicted_labels[idx]
+  true_label = true_labels[idx]
+  
+  # Color annotation: Green for correct, Red for incorrect
+  col = ifelse(predicted_label == true_label, "green", "red")
+  
+  # Plot image
+  plot(as.raster(img), axes = FALSE, main = "", xlab = "", ylab = "")
+  title(main = paste0("True: ", true_label, " | Pred: ", predicted_label),
+        col.main = col, cex.main = 0.8)
+}
+
+# Close the PNG device
+dev.off()
+```
+
+```{r,cache = TRUE, eval=TRUE}
+# Upload saved image in R Markdown
+knitr::include_graphics("images/predicted_images_grid.png")
+
+```
+
+The plot here is the result of visualizing the classification performance of our completed model (Model 3). We can easily observe that many test images were correctly classified as seen in the "true" and "Pred" labels. This is a clear confirmation about the models strong generalization abilities, which is reflected in its validation accuracy of 86.23%. Beside all that, the plot still reveals a cases of misclassifications where the predicted labels (red) differences from the true label (green). These errors showcase areas where our model have issues with recognizing, such as differentiating classes that may share similar features or visual patterns.
+
+Based on the misclassified examples, it suggests that certain classes are more challenging for our model to identify, potentially due to limited diversity in the training data or perhaps overlaps in class characteristics. For example, there is a clear pattern where the model shows errors between vehicles and animals or among similar-looking objects. Vehicle type classes seem to be recognized with greater consistency, indicating that the model has learned to differentiate these more effectively. Conversely, animal classes are sometimes misclassified as one another, likely due to their shared structural characteristics and overlapping features in the dataset. This suggests that the representation of animals in the training data may require more variation or improvement to upgrade the model's ability to pick up subtle differences within those categories.
+
+# Conclusion
+
+Our analysis shows step-wise construction of Convolutional Neural Networks (CNNs) to classify images in the CIFAR-10 dataset. Starting with a simple architecture, we progressively improved the model by adding convolutional layers in Model 2, which enabled it to extract richer and more complex features. The most significant upgrade came with Model 3, where data augmentation was introduced to increase the size and diversity of the training set---a step we deemed crucial for improving the generalization capability of our model.
+
+Model 3 achieved an impressive accuracy boost to 86.23%, demonstrating stronger generalization capabilities compared to the first two models. The confusion matrix provided valuable insights, showing that the model performed well in classifying vehicle types but struggled with distinguishing between different animal classes, potentially due to overlapping features like color and shape. In our view, these challenges reflect limitations in the dataset or the model's ability to separate closely related features. Despite these issues, the overall results indicate that the model is on a promising trajectory for future development.
+
+If we did not have computational constraints, we could have explored advanced CNN architectures like ResNet, DenseNet, or VGG as potential solutions to improve performance further. These models use deeper architectures, skip connections, and techniques like residual learning to mitigate issues such as the vanishing gradient problem, which, in our opinion, often limits the performance of deep neural networks such as ours. While implementing these models was beyond the scope of our project due to resource limitations, they remain viable approaches for achieving higher classification accuracy and tackling challenges such as distinguishing between visually similar classes.
+
+Our project focused on demonstrating practical steps to build and refine CNNs within given constraints. The goal was to showcase the practical methods for building and improving a Convolutional Neural Network to classify images effectively. Our next steps may involve experimenting with even more complex architectures, such as RNNs or LSTMs.
+
+# References
+
+Bengio, Y., Goodfellow, I., & Courville, A. (2017). Deep learning (Vol. 1). Cambridge, MA, USA: MIT press.
