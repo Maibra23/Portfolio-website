@@ -12,6 +12,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.2"      # or whichever R version you need
+
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
