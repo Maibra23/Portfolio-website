@@ -8,33 +8,39 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    env:
-      # Tell R and Quarto where to install and look for packages
-      R_LIBS_USER: ${{ runner.temp }}/R/library
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 1) Define a writable R library path and persist it to all steps
+      - name: Set up R library path
+        run: |
+          echo "R_LIBS_USER=${RUNNER_TEMP}/R/library" >> $GITHUB_ENV
+          mkdir -p "${RUNNER_TEMP}/R/library"
+
+      # 2) Install R itself
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.2"
 
-      - name: Create personal R library path
-        run: |
-          mkdir -p "$R_LIBS_USER"
-
+      # 3) Install needed R packages into that library
       - name: Install required R packages
         run: |
-          Rscript -e 'install.packages(c("knitr","rmarkdown","reticulate"), repos="https://cloud.r-project.org")'
+          Rscript -e 'install.packages(
+            c("knitr","rmarkdown","reticulate"),
+            repos="https://cloud.r-project.org"
+          )'
 
+      # 4) Install Quarto CLI
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      # 5) Render the site (fresh, no cache)
       - name: Render site
         run: quarto render --no-cache
 
+      # 6) Push built files to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
