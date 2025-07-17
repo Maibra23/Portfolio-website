@@ -1,5 +1,11 @@
 project:
   type: website
+  render:
+    - index.qmd
+    - about.qmd
+    - projects/cnn_model.qmd
+    - projects/predictive_risk_modeling.qmd
+    - projects/survival_analysis.qmd
 
 website:
   title: "Home"
@@ -11,13 +17,13 @@ website:
         menu:
           - text: "CNN Model"
             href: projects/cnn_model.qmd
-          - text: "Predictive Risk Modeling"  # ADD THIS LINE
-            href: projects/predictive_risk_modeling.qmd  # AND THIS LINE
+          - text: "Predictive Risk Modeling"
+            href: projects/predictive_risk_modeling.qmd
           - text: "Survival Analysis and Life Table"
             href: projects/survival_analysis.qmd
       - text: "About Me"
         href: about.qmd
-      
+
 format:
   html:
     theme: flatly
