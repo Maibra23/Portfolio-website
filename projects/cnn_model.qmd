@@ -10,12 +10,14 @@ website:
 
 format:
   html:
+    css: project-styles.css
     toc: true               # Enables Table of Contents
     toc-location: right     # Places TOC on the right side
     toc-depth: 2            # Limits TOC depth to second-level headings
     theme: litera           # Sets the website theme
     number-sections: true   # Adds numbered sections
     link-citations: true
+    code-fold: true         # Allows code folding 
 ---
 
 

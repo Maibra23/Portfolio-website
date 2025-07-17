@@ -11,6 +11,8 @@ website:
         menu:
           - text: "CNN Model"
             href: projects/cnn_model.qmd
+          - text: "Predictive Risk Modeling"  # ADD THIS LINE
+            href: projects/predictive_risk_modeling.qmd  # AND THIS LINE
           - text: "Survival Analysis and Life Table"
             href: projects/survival_analysis.qmd
       - text: "About Me"

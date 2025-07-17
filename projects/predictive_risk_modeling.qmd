@@ -1,0 +1,862 @@
+---
+title: "Predictive Risk Modeling for Auto Insurance: Claim Likelihood Estimation"
+website:
+  navbar:
+    left:
+      - text: "Projects"
+        menu:
+          - text: "Predictive Risk Modeling"
+            href: projects/predictive_risk_modeling.qmd
+
+format:
+  html:
+    css: project-styles.css
+    toc: true
+    toc-location: right
+    toc-depth: 2
+    theme: litera
+    number-sections: true
+    link-citations: true
+    code-fold: true         # Allows code folding 
+---
+
+# Intoduction
+
+Insurance companies operate in a world driven by probabilities, where every decision is based on a pile of aggregate information. This project aims to develop a logistic regression model capable of accurately classifying clients based on their likelihood of filing a claim and their level of risk. Beyond its technical purpose, this project also serves as a tool to bring some clarity to non-technical audiences on the often unclear process of avoiding costly financial losses, such as mistakenly classifying a high-risk client as low-risk with the help of statistical tools.
+
+The data used for this project comes from the publicly available Car Insurance Data on Kaggle [(kaggle.com/dataset/car-insurance-data)](https://www.kaggle.com/datasets/sagnik1511/car-insurance-data), which contains information on car insurance claims. This model is not only beneficial for analysts but also serves as a helpful resource for underwriters, helping to reduce or avoid potential errors. The model doesn't just predict risk; it also aligns with Solvency II standards, ensuring transparency and trust in every result.
+
+# Dataset
+
+```{r}
+# Uploading  libraries
+library(pacman)
+p_load(tidyverse, rio, mice, corrr, summarytools, caret, naniar, broom, knitr, kableExtra, pROC, DALEX, modelsummary,ggtext,shapr,DT, shinydashboard,shiny,plotly, PRROC, rsconnect)
+```
+
+## Dataset Overview
+
+```{r, cache=TRUE}
+data_car = import("/Users/Brook/Downloads/Car_Insurance_Claim.csv")
+head(data_car, 5)
+```
+
+```{r, cache=TRUE}
+# Detailed summary of the missing values, counts and percentage, data type of the predictors
+
+dfSummary(data_car) 
+```
+
+We can see that data has been imported correctly, and the quality of the data has been thoroughly examined. The dataset consists of 10,000 drivers, where most of the variables appear to be clean, except for CREDIT_SCORE and ANNUAL_MILEAGE, each with around 10% missing values. This is not necessarily a bad thing, as the issue can be addressed using imputation. A common technique to replace missing values with estimated or substituted values. Imputation not only completes the dataset but also helps mitigate potential biases and gaps in information before conducting our analysis. Since the proportion of missing values is relatively small, we will use median imputation, which is a widely accepted practice in the field.
+
+Our target variable (OUTCOME) shows a moderate class imbalance (68.7% no claims vs. 31.3% claims), which we will address later using weighted GLM to mitigate the issue associated with such imbalance. Looking at key predictors such as VEHICLE_TYPE (4.8% high-risk sports cars), AGE (20.2% young drivers), and PAST_ACCIDENTS (maximum of 15 accidents), we can observe some risk patterns. Furthermore, we are dropping ID variable as it has no predictive value, as for the POSTAL_CODE variable, we are dropping it as well because it shows low variability (69.4%) and would likely add noise without contributing to a meaningful predictive capability. Especially considering that real-world postal codes often correlate with risk factors, such as accident-prone areas
+
+Based on the data review, this are the steps that are needed before producing our model, we need to handle the missing values, do something about outlier and lastly managing class imbalance for the target variable.
+
+## Missing Value Treatment
+
+```{r, cache=TRUE }
+# Dropping POSTAL_CODE and ID Variable 
+data_car = data_car[, c(-1, -13)]
+
+# Visuals over missing values in bar plot  
+gg_miss_var(data_car) + geom_col(aes(y = n_miss, fill = n_miss > 0), color = "black", linewidth = 0.3) +  labs(subtitle = "CREDIT_SCORE and ANNUAL_MILEAGE have missing values (~10%)"
+  ) +
+  theme_classic(base_size = 12)
+```
+
+```{r, cache=TRUE}
+# Imputing, using median 
+data_car  =  data_car %>%  
+  mutate(  
+    CREDIT_SCORE = ifelse(is.na(CREDIT_SCORE), median(CREDIT_SCORE, na.rm = TRUE), CREDIT_SCORE),  
+    ANNUAL_MILEAGE = ifelse(is.na(ANNUAL_MILEAGE), median(ANNUAL_MILEAGE, na.rm = TRUE), ANNUAL_MILEAGE) )  
+
+# Checking if there's missing values in each variable
+colSums(is.na(data_car))
+```
+
+## Outlier Detection and Handling
+
+Another necessary step to consider, especially when modeling probabilities is Outliers. Which has the ability to misrepresent the relationship between predictors and the target variable. If extreme values in predictors like ANNUAL_MILEAGE or PAST_ACCIDENTS exist, they might disproportionately influence the model's weights, leading to biased odds ratios by inflating coefficients and producing misleading conclusions. From a business perspective, consider an extreme case like 22 speeding violations in the SPEEDING_VIOLATIONS variable. Cases like 22 speeding violations may indicate data errors or fraud, which would skew risk assessments.
+
+```{r, cache=TRUE}
+numeric_var = c("PAST_ACCIDENTS", "SPEEDING_VIOLATIONS", "DUIS", "ANNUAL_MILEAGE")  
+
+# Density distributions for all relevant variables
+distribution_fig = ggplot(data_car %>% pivot_longer(all_of(numeric_var)), aes(value, fill = name)) +  
+  geom_density(alpha = 0.6) +  
+  facet_wrap(~name, scales = "free", ncol = 2) +  
+  labs(  
+    title = "Distribution of Key Variables (Before Capping)",  
+    subtitle = "Right-skewed distributions with extreme values (e.g., 22 speeding violations)"  
+  ) +  
+  theme_classic() +  
+  theme(legend.position = "none") 
+
+distribution_fig 
+```
+
+Based on the distributions shown in the plot, capping DUIS, PAST_ACCIDENTS, and SPEEDING_VIOLATIONS appears reasonable, as these variables showcases a strong right skew with extreme values. The ANNUAL_MILEAGE variable, on the other hand, appears approximately normally distributed, making capping unnecessary.
+
+To alleviate the impact of Outliers on the model's coefficient estimates, we use a capping method. Capping helps to avoid biases while preserving data size and statistical power, which is important in a time-constrained project as ours. The variables targeted for capping are of a numeric nature. Mainly DUIS, PAST_ACCIDENTS, and SPEEDING_VIOLATIONS distribution, which follows a exponential distribution (see distribution figure), we would use a capping to reduce the exponential effect on our model. Variables in questions are PAST_ACCIDENTS,SPEEDING_VIOLATIONS, DUIS.
+
+```{r, cache=TRUE}
+# Capping function with thresholds 
+cap_custom = function(x, variable_n) { 
+  
+  threshold = case_when(  
+    variable_n == "DUIS" ~ 3,  
+    variable_n == "PAST_ACCIDENTS" ~ 4,  
+    variable_n == "SPEEDING_VIOLATIONS" ~ 6,  
+    TRUE ~ max(x, na.rm = TRUE)  # while no cap for the other variables  
+  )  
+  pmin(x, threshold)  
+}  
+
+# Then applying it on the dataset
+data_car = data_car %>%  
+  mutate(  
+    DUIS = cap_custom(DUIS, "DUIS"),  
+    PAST_ACCIDENTS = cap_custom(PAST_ACCIDENTS, "PAST_ACCIDENTS"),  
+    SPEEDING_VIOLATIONS = cap_custom(SPEEDING_VIOLATIONS, "SPEEDING_VIOLATIONS")  
+  )  
+
+# Distribution figure after capping
+ggplot(data_car %>%  
+         pivot_longer(c(DUIS, PAST_ACCIDENTS, SPEEDING_VIOLATIONS)),  
+       aes(value, fill = name)) +  
+  geom_density(alpha = 0.6) +  
+  facet_wrap(~name, scales = "free", ncol = 3) +  
+  labs(  
+    title = "Distributions After Threshold Capping",  
+    subtitle = "DUIS ≤2 | Accidents ≤4 | Speeding Violations ≤6"  
+  ) +  
+  theme_classic() +  
+  theme(legend.position = "none")  
+
+```
+
+Based on the figure above, the thresholds were strategically determined based on distribution analysis (see figure 1). Specifically, a threshold of 2 was implemented for DUIS. This balances the need to capture drivers with multiple offenses while limiting the impact of outlier values on the model. Given the observed distribution of PAST_ACCIDENTS, a threshold of 4 was chosen, acknowledging that most drivers have relatively few prior accidents. Lastly, for SPEEDING_VIOLATIONS, a threshold of 6 was selected, with intention to reflect a balance between capturing risky driving behavior and reducing the effects of extreme, potentially extreme values.
+
+## Feature Engineering
+
+Before building the model, we need to refine the dataset further, starting with addressing the class imbalance in the target variable (OUTCOME). A common issue with class imbalances, particularly when it involves the target variable, is that most machine learning models tend to prioritize predicting the majority class. In this case, the majority class is non-claims as the image below shows, and models often focus on it to maximize overall accuracy. Meaning that with uneven class distribution, the model will "cheat" by showing biasness toward majority class (no claims) to maximize its accuracy while ignoring the minority, from a business perspective, it would mean ignoring high risk drivers.
+
+Statistically, this can lead to misclassifying high-risk drivers as low-risk (false negatives, FN), which could result in financial losses for the insurer. We will address this using techniques like class weighting (Weighted GLM) to ensure the model does not overlook critical risk patterns.
+
+For example, a driver who is 34 years old, drives a sports car, and has had four past accidents would be considered high-risk. If such a driver is classified as low-risk by the model, it could lead to significant financial losses for the insurer due to missed risk assessments. Without corrections to address the imbalance, such cases could be missed frequently and insurer will be approving risky policies due to biased model.
+
+### Class Imbalance Handling
+
+```{r, cache=TRUE}
+# Plot class distribution
+class_dist = ggplot(data_car, aes(x = factor(OUTCOME), fill = factor(OUTCOME))) +
+  geom_bar() +
+  scale_fill_manual(values = c("blue", "red")) +
+  labs(
+    title = "Class Distribution of Insurance Claims",
+    x = "Claim Status (0 = No Claim, 1 = Claim)",
+    y = "Count",
+    fill = "Outcome"
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+class_dist
+```
+
+The plot above addresses the class imbalance. It appears that the majority class has over twice as much observations as the minority class, to be precis a class ratio: 68.7% (no claim) vs. 31.3% (claim), a 2.2:1 imbalance. By adding weights to the minority class the model will reduce incidents of false negative (risky drivers being approved) but mostly likely increase false positives (safe drivers being rejected, FP) with the main priority here from insurer point of view is to minimize financial losses over lost revenue due to rejecting safe drivers. the selection of the optimal weights will be based on the F-score, a metric often used to balance between precision and recall, and in our case maximizing the F-score helps ensure we accurately identify high-risk drivers without overly flagging low-risk ones.
+
+```{r, warning=FALSE}
+# we define and test diff weights,  1.5 - 2.5
+weights_to_test = seq(1.5, 2.5, by = 0.1)
+
+# Store
+results = data.frame(weight = weights_to_test, f_score = numeric(length(weights_to_test)))
+
+# Loop and then evaluate F-scores
+for (i in seq_along(weights_to_test)) {
+  model = glm(
+    OUTCOME ~ .,
+    data = data_car,
+    family = "binomial",
+    weights = ifelse(OUTCOME == 1, weights_to_test[i], 1)
+  )
+  predictions = ifelse(predict(model, type = "response") > 0.5, 1, 0)
+  cm = confusionMatrix(factor(predictions, levels = c(0, 1)), factor(data_car$OUTCOME, levels = c(0, 1)))
+  results$f_score[i] = cm$byClass["F1"]  
+}
+
+# Selecting the optimal weight with maximum F-score
+optimal_weight = results$weight[which.max(results$f_score)]
+optimal_f1 = max(results$f_score)
+
+
+# Plot results with highlighted optimal weight
+ggplot(results, aes(weight, f_score)) +
+  geom_line(color = "black") +
+  geom_point(color = "orange") +
+  geom_point(data = results[which.max(results$f_score), ], aes(weight, f_score),
+             color = "red", size = 4) + 
+  labs(
+    title = "Optimal Weight for Class Balancing",
+    x = "Weight for Claims (OUTCOME=1)",
+    y = "F-score"
+  ) +
+  theme_classic()
+```
+
+Now, we have obtained the optimal weight based on the F-score, which will be used when we train the model.
+
+### Variable selection
+
+now, to ensure transparency, we will be using all the predictors in the logistic model. A step to align with best practices for interpretable insurance risk modeling, where domain knowledge and regulatory compliance prioritize comprehensive risk assessment over algorithmic simplicity.
+
+Our rationale includes:
+
+-   Regulatory Requirements: Solvency II mandates insurers to justify all risk drivers, even marginally significant ones.
+
+-   Field knowledge: Different variables like EDUCATION and RACE may directly or indirectly influence risk, but at the same time provides socioeconomic context.
+
+-   Research alignment: Hsu et al. (2016b) emphasize interaction terms to capture compounding risk effects.
+
+In this step, we are creating a couple of new variables with a clear intention to capture the synergistic effects between variables, meaning the combined impact of two predictors. Which could be considered greater than their individual effects.This addresses the multiplicative nature of insurance risk (Goldburd et al., 2020), where risks is rarely additive rather they tend to be additive.
+
+# Model Specification
+
+To capture the synergistic effects between variables critical to our model, we first structure the data to enable such complex interactions when creating interaction terms during the training phase. This process involves two sequential steps:
+
+First, we encode categorical variables (e.g., driver age, vehicle type) as factors. This ensures the model treats categories as distinct risk tiers (e.g., "AGE 16-25" vs. "65+") rather than numeric values, to maintain relationships critical for interaction terms. A step which align with Goldburd et al. (2020), who emphasize that insurance risks interact multiplicatively and not additively, which justify this approach.
+
+Next, we split the data into training (70%) and test (30%) sets. This division is critical to evaluate model performance on unseen data, but also to ensure that the identified interactions generalize beyond the training environment.
+
+```{r, cache=TRUE}
+# Turning categorical variables to factors 
+data_car = data_car %>%
+  mutate(
+    AGE = factor(AGE, levels = c("16-25", "26-39", "40-64", "65+")),
+    GENDER = factor(GENDER, levels = c("female", "male")),
+    RACE = factor(RACE, levels = c("majority", "minority")),
+    
+    DRIVING_EXPERIENCE = factor(DRIVING_EXPERIENCE, 
+                                levels = c("0-9y", "10-19y", "20-29y", "30y+")),
+    
+    EDUCATION = factor(EDUCATION, levels = c("none", "high school", "university")),
+    INCOME = factor(INCOME, levels = c("poverty", "working class", "middle class", "upper class")),
+    
+    VEHICLE_YEAR = factor(VEHICLE_YEAR, levels = c("before 2015", "after 2015")),
+    VEHICLE_TYPE = factor(VEHICLE_TYPE, levels = c("sedan", "sports car")),
+    
+    MARRIED = factor(MARRIED, levels = c(0, 1), labels = c("No", "Yes")),
+    CHILDREN = factor(CHILDREN, levels = c(0, 1), labels = c("No", "Yes")),
+    VEHICLE_OWNERSHIP = factor(VEHICLE_OWNERSHIP, levels = c(0, 1), labels = c("No", "Yes")),
+        OUTCOME = factor(OUTCOME, levels = c(0, 1))
+)
+
+data_car$ANNUAL_MILEAGE = data_car$ANNUAL_MILEAGE / 1000
+
+# data shuffling and splitting 70/30 
+set.seed(987)
+
+shu_data = data_car[sample(nrow(data_car)), ]
+
+train_data = shu_data[1:7000, ]
+test_data = shu_data[7001:10000, ]
+```
+
+## Logistic Regression coefficients
+
+This section presents our model applied to the training dataset, together with key interaction terms. The model quantifies how demographic, behavioral, and vehicle-related factors influence claim likelihood, with a special focus on the interactions "AGE:VEHICLE_TYPE" and "PAST_ACCIDENTS:SPEEDING_VIOLATIONS.
+
+For easier interpretation, we transform the estimated coefficients into odds ratios and visualize these ratios. The plot below categorizes predictors as risk drivers (red) or risk reducers (green), using asterisks (\*) to denote statistical significance. This approach could be useful for insurers to identify opportunities to adjust premiums for high-risk groups or to reward safer behaviors.
+
+```{r, cache = TRUE, warning=FALSE}
+# Final Model (Training Data)
+final_model = glm(
+  OUTCOME ~ AGE + GENDER + RACE + DRIVING_EXPERIENCE + EDUCATION + INCOME +
+    CREDIT_SCORE + VEHICLE_OWNERSHIP + VEHICLE_YEAR + MARRIED + CHILDREN +
+    ANNUAL_MILEAGE + VEHICLE_TYPE + SPEEDING_VIOLATIONS + DUIS + PAST_ACCIDENTS +
+    AGE:VEHICLE_TYPE + PAST_ACCIDENTS:SPEEDING_VIOLATIONS,
+  data = train_data,
+  family = "binomial",
+  weights = ifelse(OUTCOME == 1, optimal_weight, 1)
+)
+
+# summary
+modelsummary(final_model, output = "markdown", stars = T)
+
+```
+
+
+```{r}
+
+# plot Risk driver vs. risk reducer predictors. Odds}
+# Assume final_model is your fitted logistic regression model
+model_summary <- tidy(final_model)
+
+odds_table <- data.frame(
+  Predictor = names(exp(coef(final_model))),
+  Odds_Ratio = round(exp(coef(final_model)), 2),
+  p_value = model_summary$p.value
+) %>%
+  filter(Predictor != "(Intercept)") %>%
+  mutate(
+    Effect_Type = ifelse(Odds_Ratio > 1, "Risk Driver", "Risk Reducer"),
+    Predictor_Label = ifelse(
+      p_value < 0.1,
+      paste0("<b>", Predictor, "</b>"),  # Bold significant predictors
+      Predictor
+    ),
+    Odds_Label = case_when(
+      p_value < 0.01 ~ paste0(Odds_Ratio, "***"),
+      p_value < 0.05 ~ paste0(Odds_Ratio, "**"),
+      p_value < 0.1 ~ paste0(Odds_Ratio, "*"),
+      TRUE ~ as.character(Odds_Ratio)
+    )
+  ) %>%
+  arrange(desc(Odds_Ratio))
+
+# Calculate maximum label width for dynamic margin
+max_label_width <- max(nchar(odds_table$Predictor_Label)) * 0.1
+
+odds_plot <- ggplot(odds_table, 
+                    aes(x = reorder(Predictor_Label, Odds_Ratio), 
+                        y = Odds_Ratio, 
+                        fill = Effect_Type)) +
+  geom_col(alpha = 0.8, width = 0.7) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray40") +
+  geom_text(
+    aes(label = Odds_Label),
+    hjust = -0.2, 
+    size = 3.5,
+    position = position_nudge(y = 0.05) # Small nudge to avoid bar collision
+  ) +
+  coord_flip(clip = "off") + # Allow labels to extend beyond panel
+  scale_fill_manual(values = c("Risk Driver" = "#E74C3C", "Risk Reducer" = "#2ECC71")) +
+  labs(
+    title = "All Predictors: Significant Risk Drivers/Reducers",
+    subtitle = "Odds Ratio > 1 = Higher Risk | * = p < 0.1, ** = p < 0.05, *** = p < 0.01",
+    x = "Predictor",
+    y = "Odds Ratio (Reference = 1)",
+    fill = "Effect Type"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    axis.text.y = element_markdown(size = 10, color = "black"),
+    plot.margin = margin(20, max_label_width * 10 + 60, 20, 20), # Dynamic right margin
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10)
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.2)), # Extra space on top for labels
+    limits = c(0, max(odds_table$Odds_Ratio) * 1.3)
+  )
+
+odds_plot
+```
+
+Results show significant variation in predictors' statistical power. Odds ratios serve as claim likelihood multipliers, where a value of one indicates no effect relative to the reference group, values above one suggest increased odds, and values below one indicate reduced odds. For example, an odds ratio of two means double the claim odds compared to the reference group. All interpretations are relative to baseline categories (e.g., female for gender, youngest age group, least experienced drivers).
+
+Observing the plot, there's three main risk drivers that emerge: Individuals aged 65+ driving sports cars exhibit 4.48 times higher claim odds than the reference group, representing the strongest risk driver. Male drivers show 2.65 times higher odds than females. The 40-64 age group driving sports cars demonstrates 2.3 times higher claim odds. These results are consistent with industry expectations, as both sports cars and certain demographic traits are well-known to increase risk, and a combination of these factors clearly amplifies the effect.
+
+On the other hand, the main risk reducers include 30+ years of driving experience (97% lower claims), 20-29 years of experience (96% lower claims), and vehicles produced after 2015 (82% lower claims). It appears that possessing driving experience and newer vehicle has a protective effect on filing a claim. Remarkably, past accidents correlate with 27% lower claims, suggesting behavioral changes post-accident, while marriage similarly reduces odds by 27%.
+
+One notable and somewhat surprising result is that past accidents is correlate with 27% lower claims, indicating a post-accident behavioral shift. The same is observable in regard to marriage, as it correlate with 27% lower claim. Overall, we can say that the model performs as expected, as these findings provide clear guidance for targeted premium adjustments, ensuring that pricing reflects the actual risk profile revealed by the data.
+
+## SHAP Value
+
+Previously, we explained how each predictor affects the odds of an insurance claim, showing whether a factor increases or decreases risk. Now, we focus on a different but equally important question: Which variables have the biggest impact on the model's predictions, and by how much do they influence the outcome for each case? This is where SHAP values are valuable. SHAP values measure how much each predictor contributes, on average, to increasing or decreasing the model's output for individual cases. A higher mean SHAP value means that feature has a greater overall impact on the model's predictions, regardless of whether it increases or decreases the risk. Giving us a clearer and more practical understanding of how the model makes its prediction.
+
+```{r, cache = TRUE}
+
+explainer = DALEX::explain(
+  model = final_model,
+  data  = as.data.frame(train_data)[ , setdiff(names(train_data), "OUTCOME") ],
+  # Convert factor to 0/1 on the fly:
+  y     = as.numeric(train_data$OUTCOME) - 1,
+  # Default predict_function will return log-odds; we want probabilities:
+  predict_function = function(m, newdata) {
+    predict(m, newdata = newdata, type = "response")
+  },
+  label = "Logistic Model"
+)
+
+shap_values = predict_parts(
+  explainer,
+  new_observation = train_data[1:100, ],
+  type            = "shap",
+  B               = 100
+)
+
+shap_aggregated = shap_values %>%
+  group_by(variable) %>%
+  summarize(mean_abs_shap = mean(abs(contribution)), .groups = "drop") %>%
+  arrange(desc(mean_abs_shap))
+
+# 
+ggplot(shap_aggregated, aes(
+    x = reorder(variable, mean_abs_shap),
+    y = mean_abs_shap
+  )) +
+  geom_col(fill = "#2F4F4F", width = 0.7) +
+  coord_flip() +
+  labs(
+    title    = "Global Feature Importance: SHAP Values",
+    subtitle = "Top Drivers of Insurance Claim Predictions",
+    x        = "Predictors",
+    y        = "Mean |SHAP Contribution|"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14),
+    axis.text.y   = element_text(size = 10)
+  )
+```
+
+Based on the plot, the most influential variable by far is having 20 to 29 years of driving experience. This predictor stands out with a much higher SHAP value than any other, suggesting that, in this dataset, drivers in this experience group consistently have a strong effect, either increasing or decreasing the model's predicted probability of a claim. In fact, as shown in the previous odds ratio plot, this predictor is considered a risk reducer.
+
+The next most important features are vehicle ownership status and gender, specifically being female. Both of these variables have notable contributions to the model's predictions, suggesting that whether someone owns their vehicle and their gender play significant roles in how the model assesses risk. Another important observation includes driving a car manufactured before 2015 and being married. Similarly, as we saw in the odds ratio plot, driving a car produced after 2015 appeared to reduce the odds of filing a claim relative to the reference group, which is cars produced before 2015. Following this logic, driving a car before 2015 can be considered a risk contributor. Being married also appears meaningful in the SHAP plot, as it was in the odds ratio plot, though to a lesser extent.
+
+Several other predictors, such as the number of speeding violations, past accidents, education level, and whether the driver has children, have smaller but still measurable impacts on the model's predictions. Intriguingly, factors like annual mileage, past accidents, driving experience above 30 years, and having children appear to have relatively little to no effect according to the SHAP analysis, even though some of these might be expected to have a noticeable influence.
+
+This simply implies that, for this particular model and dataset, experience, car ownership, and certain demographic factors are the dominant drivers of predicted claim risk. Overall, it is plausible to say that these insights can be helpful to raise attention on the characteristics that influence claim risk, especially when we consider the fact that these insights still lie within the traditional assumptions in the insurance industry and can support more focused risk management and pricing strategies \### 3.3 Model Performance and metrics
+
+```{r, cache=TRUE}
+# Generate predictions on test data
+test_pred_prob = predict(final_model, newdata = test_data, type = "response")
+test_pred_class = ifelse(test_pred_prob > 0.5, 1, 0)  # Threshold = 0.5
+
+# ROC-AUC
+roc_curve = roc(test_data$OUTCOME, test_pred_prob)
+auc_value = auc(roc_curve)
+roc_curve
+
+# Plot ROC Curve
+plot(roc_curve, main = "ROC Curve (Test Data)", col = "#2F4F4F", print.auc = TRUE)
+
+```
+
+```{r, cache = TRUE}
+# Generate confusion matrix
+conf_matrix = confusionMatrix(
+  factor(test_pred_class, levels = c(0, 1)),
+  factor(test_data$OUTCOME, levels = c(0, 1)),
+  positive = "1"
+)
+# Convert to dataframe
+cm_df = as.data.frame(conf_matrix$table)
+
+# Create label for each cell
+cm_df = cm_df %>%
+  mutate(Label = case_when(
+    Prediction == 1 & Reference == 1 ~ "True Positive",
+    Prediction == 0 & Reference == 1 ~ "False Negative",
+    Prediction == 1 & Reference == 0 ~ "False Positive",
+    Prediction == 0 & Reference == 0 ~ "True Negative"
+  ))
+
+# Plot 
+ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = paste0(Label, "\n", Freq)), color = "white", size = 5) +
+  scale_fill_gradient(low = "#2F4F4F", high = "#E74C3C") +
+  labs(
+    title = "Confusion Matrix with Labelled Outcomes (Threshold = 0.5)",
+    x = "Actual Outcome",
+    y = "Predicted Outcome") +
+  theme_classic()
+```
+
+lets see how well the model ranks clients using AUC, a metric mostly used to determine the classification power of the model to differentiate between high vs. low clients. while using confusion metric will help us Show the exact counts of misclassifications (false negatives/positives) which could be helpful in the next step, where we intend to apply it in a practical business related scenarios with simulations.
+
+# Business Impact, with Interactive Dashboard
+
+With this custom made interactive dashboard [Risk model](http://maibra23.shinyapps.io/predictive-risk), users can explore how different risk thresholds and cost settings shape the insurer's financial outcomes. The left panel allows users to set and adjust key assumptions, such as the risk threshold, costs of false negatives and false positives, and average premium and average claim. Any changes update the results instantly, showing the direct impact on net savings and other important model metrics. On the right, the dashboard provides a clear visual summary of financial trade-offs between risk capture (true positives) and misclassifications costs. Making it easy for both technical and non-technical audience to identify the most cost-effective risk management strategy for the insurance portfolio.
+
+-   **Cost-benefits visualization**: The 3D sensitivity plot explores how the cost per false negative (FN), cost per false positive (FP), and net savings interact. Supplying us with a clear view of costs and benefits under different scenarios.
+-   **Instant Recommendations**: With a single click, the "Optimize Threshold" button finds the optimal risk threshold that maximizes net savings for your chosen input values. While the "Calculate Optimal Premium" button suggests the most profitable premium to charge for the given scenario.
+-   **Live Key Metrics:** The dynamic metrics table updates automatically as you change inputs, displaying essential model statistics like accuracy, precision, and cost breakdowns. This helps the users to assess how reliable and effective our model are under different settings.
+
+Overall, our goal with this dashboard is not only to make complex risk and cost calculations transparent but also to showcase how regression models, like logistic regression, can be powerful tools for optimizing net savings in risk analysis.
+
+```{r, echo=FALSE, eval=FALSE}
+# Preparing data
+test_data$OUTCOME = factor(test_data$OUTCOME, levels = c("0", "1"))
+test_pred_prob = predict(final_model, newdata = test_data, type = "response")
+roc_curve = roc(test_data$OUTCOME, test_pred_prob)
+
+# Precompute actual claims count
+actual_claims = sum(test_data$OUTCOME == "1")
+
+# UI Definition
+ui = dashboardPage(
+  dashboardHeader(title = "Risk Model Dashboard"),
+  dashboardSidebar(
+    sliderInput("threshold", "Risk Threshold:", 0, 1, 0.5, step = 0.01),
+    numericInput("cost_fn", "Cost per False Negative (SEK):", 7000),
+    numericInput("cost_fp", "Cost per False Positive (SEK):", 4000),
+    numericInput("premium", "Average Premium (SEK):", value = 3000),
+    numericInput("claim", "Average Claim (SEK):", value = 12000),
+    actionButton("optimize", "Find Optimal Threshold"),
+    actionButton("optimize_premium", "Calculate Optimal Premium")
+  ),
+  dashboardBody(
+    tabBox(
+      width = 12,
+      tabPanel(
+        "Performance",
+        fluidRow(
+          box(plotlyOutput("roc_curve"), width = 6),
+          box(plotOutput("conf_matrix"), width = 6)
+        )
+      ),
+      tabPanel(
+        "Financial Impact",
+        fluidRow(
+          column(6, box(plotlyOutput("savings_breakdown"), width = 12, 
+                        title = "Financial Impact Breakdown")),
+          column(6, box(DTOutput("metrics_table"), width = 12, 
+                        title = "Key Metrics", 
+                        style = "overflow-y: auto; height: 400px;"))
+        ),
+        fluidRow(
+          box(plotlyOutput("sensitivity_3d", height = "500px"), width = 6,
+              title = "3D Cost Sensitivity Analysis"),
+          box(plotlyOutput("savings_sensitivity"), width = 6,
+              title = "2D Cost Sensitivity", height = "500px")
+        )
+      )
+    )
+  )
+)
+
+server = function(input, output, session) {
+  # Precomputed actual claims
+  actual_claims_val = reactiveVal(sum(test_data$OUTCOME == "1"))
+  
+  # Reactive confusion matrix
+  conf_matrix = reactive({
+    req(test_pred_prob, test_data$OUTCOME)
+    pred_class = ifelse(test_pred_prob > input$threshold, 1, 0)
+    confusionMatrix(factor(pred_class), test_data$OUTCOME, positive = "1")
+  })
+  
+  # FINANCIAL CALCULATIONS (REVISED)
+  financials = reactive({
+    cm = conf_matrix()$table
+    TP = cm["1","1"]   # Correctly rejected high-risk
+    TN = cm["0","0"]   # Correctly accepted low-risk
+    FP = cm["1","0"]   # Wrongly rejected safe clients
+    FN = cm["0","1"]   # Wrongly accepted high-risk
+    
+    # Core financial metrics
+    Revenue = (TN + FN) * input$premium  # Premiums from accepted policies
+    Claim_Payouts = FN * input$claim     # Claims paid for accepted high-risk
+    
+    # Cost components
+    FP_Cost = FP * input$cost_fp         # Opportunity cost of rejecting safe clients
+    Operational_Costs = 0.15 * (FP_Cost + Claim_Payouts)  # Scaling with workload
+    
+    # Profit calculation
+    Profit = Revenue - Claim_Payouts - FP_Cost - Operational_Costs
+    
+    # No-model baseline (accept all applicants)
+    Baseline_Profit = (nrow(test_data) * input$premium) - (actual_claims_val() * input$claim)
+    
+    # Net savings vs. baseline
+    Net_Savings = Profit - Baseline_Profit
+    
+    list(
+      TP = TP, FN = FN, FP = FP, TN = TN,
+      Revenue = Revenue,
+      Claim_Payouts = Claim_Payouts,
+      FP_Cost = FP_Cost,
+      Operational_Costs = Operational_Costs,
+      Profit = Profit,
+      Baseline_Profit = Baseline_Profit,
+      Net_Savings = Net_Savings
+    )
+  })
+  
+  # 3D Sensitivity Analysis
+  output$sensitivity_3d = renderPlotly({
+    req(test_pred_prob, test_data$OUTCOME)
+    
+    fn_range = seq(input$cost_fn * 0.5, input$cost_fn * 2, length.out = 10)
+    fp_range = seq(input$cost_fp * 0.5, input$cost_fp * 2, length.out = 10)
+    thresholds = seq(0.1, 0.9, length.out = 10)
+    
+    grid = expand.grid(
+      fn_cost = fn_range,
+      fp_cost = fp_range,
+      threshold = thresholds
+    )
+    
+    grid$net_savings = mapply(function(fn, fp, t) {
+      pred_class = ifelse(test_pred_prob > t, 1, 0)
+      cm = confusionMatrix(factor(pred_class), test_data$OUTCOME, positive = "1")$table
+      TP = cm["1","1"]
+      FN = cm["0","1"]
+      TN = cm["0","0"]
+      FP = cm["1","0"]
+      
+      # Revised profit calculation
+      Revenue = (TN + FN) * input$premium
+      Claim_Payouts = FN * input$claim
+      FP_Cost = FP * fp
+      Operational_Costs = 0.15 * (FP_Cost + Claim_Payouts)
+      
+      Profit = Revenue - Claim_Payouts - FP_Cost - Operational_Costs
+      Baseline_Profit = (nrow(test_data) * input$premium) - (actual_claims_val() * input$claim)
+      
+      Profit - Baseline_Profit  # Net savings
+    }, grid$fn_cost, grid$fp_cost, grid$threshold)
+    
+    plot_ly(grid, x = ~fn_cost, y = ~fp_cost, z = ~net_savings,
+            color = ~threshold, colors = viridis::viridis(100),
+            type = "scatter3d", mode = "markers",
+            marker = list(size = 5)) %>%
+      layout(
+        scene = list(
+          xaxis = list(title = "FN Cost (SEK)"),
+          yaxis = list(title = "FP Cost (SEK)"),
+          zaxis = list(title = "Net Savings (SEK)"),
+          camera = list(eye = list(x = 1.5, y = -1.5, z = 0.5))
+        ),
+        title = list(text = "3D Cost Sensitivity Analysis", y = 0.98)
+      )
+  })
+  
+  # Inside server function - replace the existing observeEvent for threshold optimization
+observeEvent(input$optimize, {
+  showNotification("Calculating optimal threshold...", duration = 3)
+  
+  thresholds = seq(0.1, 0.9, by = 0.01)
+  savings = sapply(thresholds, function(t) {
+    pred_class = ifelse(test_pred_prob > t, 1, 0)
+    cm = confusionMatrix(factor(pred_class), test_data$OUTCOME, positive = "1")$table
+    TP = cm["1","1"]
+    FN = cm["0","1"]
+    TN = cm["0","0"]
+    FP = cm["1","0"]
+    
+    Revenue = (TN + FN) * input$premium
+    Claim_Payouts = FN * input$claim
+    FP_Cost = FP * input$cost_fp
+    Operational_Costs = 0.15 * (FP_Cost + Claim_Payouts)
+    
+    Profit = Revenue - Claim_Payouts - FP_Cost - Operational_Costs
+    Baseline_Profit = (nrow(test_data) * input$premium) - (actual_claims_val() * input$claim)
+    
+    Profit - Baseline_Profit  # Net savings
+  })
+  
+  optimal = thresholds[which.max(savings)]
+  updateSliderInput(session, "threshold", value = optimal)
+})
+
+  
+  # Optimal Premium Calculation
+  observeEvent(input$optimize_premium, {
+    cm = conf_matrix()$table
+    FN = cm["0","1"]
+    TN = cm["0","0"]
+    
+    # Risk-adjusted premium calculation
+    Expected_Claims = FN / (TN + FN)  # Claim rate among accepted
+    Risk_Load = 0.25  # 25% risk loading
+    optimal_premium = input$claim * Expected_Claims * (1 + Risk_Load)
+    
+    updateNumericInput(session, "premium", value = round(optimal_premium, -2))
+  })
+  
+  # FIXED: 2D Sensitivity Plot
+  output$savings_sensitivity = renderPlotly({
+    req(input$cost_fn, input$cost_fp, input$premium, input$claim)
+    
+    cost_fn_range = seq(input$cost_fn * 0.5, input$cost_fn * 1.5, length.out = 20)
+    cost_fp_range = seq(input$cost_fp * 0.5, input$cost_fp * 1.5, length.out = 20)
+    
+    grid = expand.grid(cost_fn = cost_fn_range, cost_fp = cost_fp_range)
+    
+    # Calculate net savings for each combination
+    grid$net_savings = mapply(function(fn, fp) {
+      # Get current confusion matrix
+      cm = conf_matrix()$table
+      TP = cm["1","1"]
+      FN = cm["0","1"]
+      TN = cm["0","0"]
+      FP = cm["1","0"]
+      
+      # Calculate financials with current parameters
+      Revenue = (TN + FN) * input$premium
+      Claim_Payouts = FN * input$claim
+      FP_Cost = FP * fp
+      Operational_Costs = 0.15 * (FP_Cost + Claim_Payouts)
+      
+      Profit = Revenue - Claim_Payouts - FP_Cost - Operational_Costs
+      Baseline_Profit = (nrow(test_data) * input$premium) - (actual_claims_val() * input$claim)
+      
+      Profit - Baseline_Profit  # Net savings
+    }, grid$cost_fn, grid$cost_fp)
+    
+    plot_ly(
+      data = grid,
+      x = ~cost_fn,
+      y = ~cost_fp,
+      z = ~net_savings,
+      type = "contour",
+      colorscale = "Viridis",
+      contours = list(showlabels = TRUE)
+    ) %>%
+      layout(
+        title = "2D Net Savings Sensitivity",
+        xaxis = list(title = "Cost per False Negative (SEK)"),
+        yaxis = list(title = "Cost per False Positive (SEK)"),
+        annotations = list(
+          x = input$cost_fn,
+          y = input$cost_fp,
+          text = "Current Values",
+          showarrow = TRUE
+        )
+      )
+  })
+  
+  # ROC Curve
+  output$roc_curve = renderPlotly({
+    gg = ggplot() +
+      geom_path(aes(x = 1 - roc_curve$specificities, 
+                   y = roc_curve$sensitivities),
+               color = "#3498db") +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+      geom_vline(xintercept = 1 - input$threshold, color = "#e74c3c") +
+      labs(title = "ROC Curve", 
+          x = "False Positive Rate (1 - Specificity)", 
+          y = "True Positive Rate (Sensitivity)") +
+      theme_minimal()
+    
+    ggplotly(gg) %>% 
+      layout(annotations = list(
+        x = 1 - input$threshold,
+        y = roc_curve$sensitivities[which.min(abs(roc_curve$thresholds - input$threshold))],
+        text = paste("Threshold =", input$threshold),
+        showarrow = TRUE
+      ))
+  })
+  
+  # Confusion Matrix
+  output$conf_matrix = renderPlot({
+    cm_df = as.data.frame(conf_matrix()$table)
+    levels(cm_df$Reference) = c("No Claim", "Claim")
+    levels(cm_df$Prediction) = c("No Claim", "Claim")
+    
+    ggplot(cm_df, aes(Reference, Prediction, fill = Freq)) +
+      geom_tile(alpha = 0.8) +
+      geom_text(aes(label = paste0(c("TN", "FP", "FN", "TP"), "\n", Freq)), 
+               color = "white", size = 6) +
+      scale_fill_gradient(low = "#34495e", high = "#e74c3c") +
+      labs(title = "Confusion Matrix", x = "Actual", y = "Predicted") +
+      theme_minimal()
+  })
+  
+  # Financial Breakdown
+  output$savings_breakdown = renderPlotly({
+    fin = financials()
+    plot_ly(
+      x = c("Revenue", "Claim Payouts", "FP Opportunity Cost", "Operational Costs", "Profit"),
+      y = c(fin$Revenue, -fin$Claim_Payouts, -fin$FP_Cost, -fin$Operational_Costs, fin$Profit),
+      type = "bar",
+      marker = list(color = c('#3498db', '#e74c3c', '#e67e22', '#f39c12', '#2ecc71')),
+      text = c(
+        paste0(format(fin$Revenue, big.mark = " "), " SEK"),
+        paste0(format(-fin$Claim_Payouts, big.mark = " "), " SEK"),
+        paste0(format(-fin$FP_Cost, big.mark = " "), " SEK"),
+        paste0(format(-fin$Operational_Costs, big.mark = " "), " SEK"),
+        paste0(format(fin$Profit, big.mark = " "), " SEK")
+      ),
+      textposition = 'outside'
+    ) %>%
+      layout(
+        title = "Financial Breakdown (With Model)",
+        yaxis = list(title = "Amount (SEK)"),
+        xaxis = list(title = "")
+      )
+  })
+  
+  # Metrics Table
+  output$metrics_table = renderDT({
+    fin = financials()
+    cm = conf_matrix()
+    
+    # Calculate percentages
+    accepted_pct = round(100 * (fin$TN + fin$FN) / nrow(test_data), 1)
+    rejected_pct = round(100 * (fin$TP + fin$FP) / nrow(test_data), 1)
+    
+    metrics = data.frame(
+      Metric = c("Threshold", 
+                "Accuracy", 
+                "Precision", 
+                "Recall (Sensitivity)",
+                "AUC",
+                "Accepted Policies",
+                "Rejected Policies",
+                "Net Savings (vs Baseline)",
+                "Baseline Profit",
+                "Model Profit"),
+      Value = c(
+        input$threshold,
+        round(cm$overall["Accuracy"], 3),
+        round(cm$byClass["Precision"], 3),
+        round(cm$byClass["Recall"], 3),
+        round(auc(roc_curve), 3),
+        paste0(fin$TN + fin$FN, " (", accepted_pct, "%)"),
+        paste0(fin$TP + fin$FP, " (", rejected_pct, "%)"),
+        format(round(fin$Net_Savings), big.mark = " "),
+        format(round(fin$Baseline_Profit), big.mark = " "),
+        format(round(fin$Profit), big.mark = " ")
+      )
+    )
+    
+    datatable(metrics, rownames = FALSE, 
+              options = list(dom = 't', pageLength = 12)) %>%
+      formatStyle('Value', fontWeight = 'bold')
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+Let's set input parameters to reflect a practical yearly scenario using [the dashboard](http://maibra23.shinyapps.io/predictive-risk): risk threshold at 0.75, false negative (FN) cost = 6,300 SEK, false positive (FP) cost = 4,000 SEK, average premium = 3,000 SEK, and average claim payout = 12,000 SEK.
+
+In the no-model baseline at a 0.75 risk threshold, all 961 actual claims are approved without any scrutiny, resulting in a total payout of 961 × 12,000 = 11,532,000 SEK. Premium revenue from all policies (3,000 × 3,000 = 9,000,000 SEK) falls short of covering these losses, yielding a baseline loss of 2,532,000 SEK. This represents the insurer's maximum financial exposure without any risk modeling.
+
+At the same 0.75 threshold, using our model (as demonstrated in the [**interactive dashboard**](http://maibra23.shinyapps.io/predictive-risk), claim payouts significantly decrease as the insurer accepts only 2,402 policies (an 80.1% acceptance rate), generating premium revenue of 7,206,000 SEK. Claim payouts for misclassified high-risk clients total 495 × 12,000 = 5,940,000 SEK. Opportunity costs from 101 wrongly rejected safe clients amount to 404,000 SEK. Operational expenses add 951,600 SEK (15% of claim and opportunity costs). Total costs reach 7,295,600 SEK, resulting in a model profit of 316,400 SEK. Compared to the baseline loss, this generates 2,848,400 SEK in net savings, clearly demonstrating financial improvement with our model.
+
+By rejecting 19.9% of applicants (596 drivers), the insurer avoids 466 high-risk policies that would have cost 5,592,000 SEK in claims. This showcases the model's ability to strategically reallocate resources, converting potential 12,000 SEK liabilities into 4,000 SEK opportunity costs per avoided client. The trade-off here balances risk reduction with market retention, accepting 101 false positives to prevent 466 high-risk approvals. Performance-wise, the metrics validate this approach: an AUC of 0.901 demonstrates excellent risk discrimination, 83.1% precision indicates reliable risk identification, and a 0.636 F1-score reflects a balanced precision-recall ratio.
+
+While effective, the model isn't yet profit-optimized for these parameters. Clicking "Find Optimal Threshold" shifts the threshold to 0.49, significantly improving financial outcomes. This adjustment increases risk detection recall from 51.5% to 80.5%, reducing false negatives from 495 to 189. Although false positives rise to 359, the net financial impact is transformative. Premium revenue is now 5,802,000 SEK, operational costs drop to 555,600 SEK, and model profit jumps to 1,878,200 SEK. Net savings increase to 4,410,200 SEK---a 55% improvement over the 0.75 threshold results. This improvement is a direct result of threshold optimization.
+
+The 0.49 threshold prioritizes catching high-risk drivers (189 FNs versus 495 previously) while strategically accepting higher investigation costs (359 FPs versus 101). The change is also reflected in performance metrics: F1-score rises to 0.763 as recall improves significantly, while precision moderates to 72.6% as the model casts a wider net for high-risk cases. The incentive here is to solve the cost-minimizing, profit-maximizing problem. The dashboard enables this optimization through its profit-maximization algorithm, which tests thresholds to find the ideal balance where marginal risk-detection gains equal marginal opportunity costs.
+
+It is safe to state that with the help of the dashboard, anyone can leverage predictive modeling to transform risk management. At a 0.75 threshold, the model turns a 2.5M SEK loss into modest profitability. If optimized, as in this case it generates substantial profits while controlling risk exposure. Visually, the 3D plot reveals profit-maximizing cost ratios, while the 2D plot identifies operational safe zones where profit varies less than 5% despite cost fluctuations. Which basically allow the users to make informed decisions based to their risk appetite and business goals.
+
+# Conclusion and Next Steps
+
+In this project, we developed a predictive risk modeling framework that accurately quantifies insurance claim probabilities in the auto insurance sector. Our framework retains all relevant predictors to ensure adherence with regulatory standards such as Solvency II, while simultaneously capturing compound risk patterns through interaction effects. We deployed the model through an interactive dashboard to optimize decision-making via cost-benefit analysis, while enabling stakeholders to test and simulate different scenarios by adjusting risk thresholds and parameters.
+
+Technically, our model reveals strong performance on test data, with an AUC of 0.903 indicating excellent discriminatory ability to differentiate between risky and safe clients, complemented by a solid F-score score of 0.76 that reflects a balanced trade-off between precision and recall. With a simple modification, we were able to simplify the interpretation of the model by using odds ratios to identify key predictors that influence risk direction either positively or negatively (risk drivers or reducers) in an intuitive manner.
+
+The most significant risk driver emerged as sports car drivers aged 65+, with 4.48 times higher claim likelihood, closely followed by male drivers at 2.65 times higher risk. In contrast, drivers with 20+ years of experience showed the strongest risk reduction effect.
+
+Financially, this framework serves as the backbone of our interactive dashboard, allowing users to simulate strategies based on custom profiles and risk scenarios. This functionality empowers decision-makers through improved transparency and individualized risk assessment.
+
+In our opinion, the next steps should be focused on strengthening the predictive power and flexibility of the model using more advanced machine learning methods. One example would be to integrate gradient boosting algorithms, such as XGBoost or LightGBM. This would allow us to capture non-linear relationships and high-order interactions that logistic regression may overlook, and would also remove the need for manual specification of interaction terms, offering a more adaptive approach to risk modeling.
+
+# References
+
+1.  Hsu, Y., Chou, P., & Shiu, Y. (2016). An examination of the relationship between vehicle insurance purchase and the frequency of accidents. *Asia Pacific Management Review*, *21*(4), 231--238. https://doi.org/10.1016/j.apmrv.2016.08.001
+
+2.  Mark Goldburd, Khare, A., Tevet, D., Guller, D., & Casualty Actuarial Society. (2020). *GENERALIZED LINEAR MODELS FOR INSURANCE RATING* (Second Edition). Casualty Actuarial Society.
