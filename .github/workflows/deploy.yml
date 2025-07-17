@@ -1,31 +1,49 @@
-name: Deploy Quarto Website
+name: Render and Deploy Quarto Site
 
 on:
   push:
-    branches:
-      - main  # Runs the workflow whenever you push to the main branch
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Setup Quarto
-        uses: quarto-dev/quarto-actions/setup@v2
+      # 1) Define a writable R library path and persist it to all steps
+      - name: Set up R library path
+        run: |
+          echo "R_LIBS_USER=${RUNNER_TEMP}/R/library" >> $GITHUB_ENV
+          mkdir -p "${RUNNER_TEMP}/R/library"
+
+      # 2) Install R itself
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
         with:
-          version: latest
+          r-version: "4.2"
 
-      # Step 3: Render the Quarto site
-      - name: Render Quarto site
-        run: quarto render
+      # 3) Install needed R packages into that library
+      - name: Install required R packages
+        run: |
+          Rscript -e 'install.packages(
+            c("knitr","rmarkdown","reticulate"),
+            repos="https://cloud.r-project.org"
+          )'
 
-      # Step 4: Deploy to GitHub Pages
+      # 4) Install Quarto CLI
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      # 5) Render the site (fresh, no cache)
+      - name: Render site
+        run: quarto render --no-cache
+
+      # 6) Push built files to GitHub Pages
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site  # Deploy the '_site/' folder
+          publish_dir: ./docs
+          publish_branch: gh-pages
